@@ -1,6 +1,6 @@
 # Omnino
 
-Omnino is a windowing system for web applications, inspired by the Acme text editor. It divides the display, or a portion of it, into columns and windows which may be created, deleted, resized, and reordered.
+Omnino is a windowing system for web applications, inspired by the Acme text editor. It divides the display, or a portion of it, into columns and windows which may be created, deleted, resized, and reordered. A [live demo](https://bopwerks.github.io/omnino/) is available.
 
 ![Screenshot](screenshot.png?raw=true "Screenshot")
 
