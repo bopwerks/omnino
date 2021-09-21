@@ -853,27 +853,27 @@ class OmninoWindow extends HTMLElement {
                                 }
                             }
                         } else {
-                            const neighborcol = srcleft ? srcleft : (srcright ? srcright : null);
+                            const neighborwin = srcleft ? srcleft : (srcright ? srcright : null);
 
-                            const srcidx = elementIndex(srccol);
-                            const dstidx = elementIndex(dstcol);
-                            const neighboridx = neighborcol ? elementIndex(neighborcol) : -1;
+                            const srcidx = elementIndex(srcwin);
+                            const dstidx = elementIndex(dstwin);
+                            const neighboridx = neighborwin ? elementIndex(neighborwin) : -1;
 
                             // TODO: Find x coordinate of moved column's new position
-                            const oldSrcColumnWidthPct = app.columns[srcidx];
-                            const oldDstColumnWidthPct = app.columns[dstidx];
-                            const a = dstcol.offsetLeft - apprect.left;
-                            const b = dstcol.offsetLeft - apprect.left + dstcol.offsetWidth;
-                            const newColumnX = clamp(a + minWidth, x, b - minWidth);
-                            if (newColumnX !== undefined) {
+                            const oldSrcWindowHeightPct = dstcol.windows[srcidx];
+                            const oldDstWindowHeightPct = dstcol.windows[dstidx];
+                            const a = dstwin.getBoundingClientRect().top - apprect.top;
+                            const b = dstwin.getBoundingClientRect().top - apprect.top + dstwin.getBoundingClientRect().height;
+                            const newWindowY = clamp(a + minHeight, y, b - minHeight);
+                            if (newWindowY !== undefined) {
                                 // Make room for the source column in the dest column and grow the neighbor column
-                                const newSrcColumnWidth = b - newColumnX;
-                                const newSrcColumnWidthPct = fixPrecision(Math.abs(newSrcColumnWidth * 100 / appWidth));
-                                const newDstColumnWidthPct = fixPrecision(oldDstColumnWidthPct - newSrcColumnWidthPct);
-                                app.columns[srcidx] = newSrcColumnWidthPct;
-                                app.columns[dstidx] = newDstColumnWidthPct;
+                                const newSrcWindowHeight = b - newWindowY;
+                                const newSrcWindowHeightPct = fixPrecision(newSrcWindowHeight * 100 / columnHeight);
+                                const newDstWindowHeightPct = fixPrecision(oldDstWindowHeightPct - newSrcWindowHeightPct);
+                                dstcol.windows[srcidx] = newSrcWindowHeightPct;
+                                dstcol.windows[dstidx] = newDstWindowHeightPct;
                                 if (neighboridx >= 0) {
-                                    app.columns[neighboridx] = fixPrecision(app.columns[neighboridx] + oldSrcColumnWidthPct);
+                                    dstcol.windows[neighboridx] = fixPrecision(dstcol.windows[neighboridx] + oldSrcWindowHeightPct);
                                 }
                                 // app.columns[srcidx] = newSrcColumnWidthPct;
                                 // Move source column after dest column
@@ -882,14 +882,9 @@ class OmninoWindow extends HTMLElement {
                                     arr.splice(i, 1);
                                     arr.splice((i < j) ? j-1 : j, 0, elt);
                                 }
-                                moveElement(app.columns, srcidx, dstidx+1);
-                                // app.columns = app.columns.map((elt, i, arr) => {
-                                //     if 
-                                // });
-                                // app.columns.splice(dstidx+1, 0, newSrcColumnWidthPct);
-                                // app.columns.splice(srcidx, 1);
+                                moveElement(dstcol.windows, srcidx, dstidx+1);
                                 this.ismoving = true;
-                                app.insertBefore(srccol, dstcol.nextElementSibling);
+                                dstcol.insertBefore(srcwin, dstwin.nextElementSibling);
                                 this.ismoving = false;
                             }
                         }
