@@ -568,8 +568,8 @@ class OmninoColumn extends HTMLElement {
             nav.appendChild(elt);
         });
     }
-    addWindow() {
-        const newWindow = document.createElement("omnino-win");
+    addWindow(win) {
+        const newWindow = win ? win : document.createElement("omnino-win");
         this.appendChild(newWindow);
         return makeWindowProxy(newWindow);
     }
@@ -711,18 +711,21 @@ class OmninoWindow extends HTMLElement {
                 handle.classList.add("handle");
                 handle.addEventListener("mousedown", mouseDownEvent => {
                     // Compute offset of mouse from the top left of the column.
-                    const column = omninowin.parentElement;
-                    const columnrect = app.getBoundingClientRect();
+                    const omninocol = omninowin.parentElement;
+                    const app = omninocol.parentElement;
+                    const apprect = app.getBoundingClientRect();
                     // console.log(`App left: ${apprect.left}`);
                     const colrect = omninocol.getBoundingClientRect();
+                    const winrect = omninowin.getBoundingClientRect();
                     // console.log(`Source column left: ${colrect.left}`);
                     // console.log(`Mouse X: ${mouseDownEvent.clientX}`);
                     // The position of the column relative to the OmninoApplication.
-                    const oldColumnX = colrect.left - apprect.left;
+                    // const oldColumnX = colrect.left - apprect.left;
                     // The position of the mousedown event relative to the OmninoApplication.
-                    const mouseDownX = mouseDownEvent.clientX - apprect.left;
+                    // const mouseDownX = mouseDownEvent.clientX - apprect.left;
                     // The x displacement from the top-left corner of the column to the mouse.
-                    const mouseOffsetX = mouseDownEvent.clientX - colrect.left; //x position within the element.
+                    const mouseOffsetX = mouseDownEvent.clientX - winrect.left; //x position within the element.
+                    const mouseOffsetY = mouseDownEvent.clientY - winrect.top; //x position within the element.
                     // console.log(`Mouse offset X: ${mouseOffsetX}`);
 
                     // Store the offset in the parent to be used by its mouseup handler.
@@ -732,24 +735,22 @@ class OmninoWindow extends HTMLElement {
 
                     // TODO: Add mouseup handler
                     const cancelWindowMovement = event => {
-                        app.removeEventListener("mouseup", moveColumns);
+                        app.removeEventListener("mouseup", moveWindows);
                         app.style.cursor = "default";
                         app.style.userSelect = "auto";
                         app.removeEventListener("mouseleave", cancelWindowMovement);
                     };
-                    const moveColumns = mouseUpEvent => {
+                    const moveWindows = mouseUpEvent => {
                         // Compute the position of the mouse event relative to OmninoApplication.
                         const rect = mouseUpEvent.currentTarget.getBoundingClientRect();
                         const dx = mouseUpEvent.clientX - mouseDownEvent.clientX;
                         const x = mouseUpEvent.clientX - rect.left - mouseOffsetX; //x position within the element, offset by the mouse.
+                        const y = mouseUpEvent.clientY - rect.top - mouseOffsetY;
 
                         const minWidth = app.minColumnWidth;
                         const appWidth = app.getBoundingClientRect().width;
 
-                        // Determine in which column the current mouse x-position would fall.
-                        //const srccol = omninocol;
-                        //const leftcol = srccol.previousElementSibling;
-                        //const rightcol = srccol.nextElementSibling;
+                        // Determine in which column and window the mouseup event occured.
                         let dstcol = null;
                         for (let i = 0, w = 0; i < app.children.length && w < x; ++i) {
                             dstcol = app.children[i];
@@ -757,12 +758,22 @@ class OmninoWindow extends HTMLElement {
                             w += r.width;
                         }
                         console.assert(dstcol !== null);
-                        // console.log("Target Column:", dstcol);
+                        console.log("Target Column:", dstcol);
+
+                        let dstwin = null;
+                        for (let i = 0, h = 0; i < dstcol.children.length && h < y; ++i) {
+                            dstwin = dstcol.children[i];
+                            const r = dstwin.getBoundingClientRect();
+                            h += r.height;
+                        }
+                        console.log("Target Window:", dstwin);
 
                         const srccol = omninocol;
-                        const srcleft = srccol.previousElementSibling;
-                        const srcright = srccol.nextElementSibling;
-                        const isResize = (dstcol === srccol || (srcleft !== null && dstcol === srcleft));
+                        const srcwin = omninowin;
+                        const srcleft = srcwin.previousElementSibling;
+                        const srcright = srcwin.nextElementSibling;
+                        const isResize = (dstcol === srccol && (srcwin === dstwin || (srcleft !== null && dstwin === srcleft)));
+                        const isMove = (dstcol !== srccol);
                         
                         if (isResize) {
                             const shrinkcol = (dx < 0) ? srcleft : srccol;
@@ -783,6 +794,14 @@ class OmninoWindow extends HTMLElement {
                                     app.columns[shrinkidx] = fixPrecision(app.columns[shrinkidx] - widthPct);
                                     app.columns[growidx] = fixPrecision(app.columns[growidx] + widthPct);
                                 }
+                            }
+                        } else if (isMove) {
+                            const destinationColumnIsEmpty = (dstwin === null);
+                            if (destinationColumnIsEmpty) {
+                                omninowin.removeWindow();
+                                dstcol.addWindow(omninowin);
+                            } else {
+                                // TODO: Insert the window among the others in dstcol.
                             }
                         } else {
                             const neighborcol = srcleft ? srcleft : (srcright ? srcright : null);
@@ -828,8 +847,8 @@ class OmninoWindow extends HTMLElement {
                         app.updateColumns();
                         cancelWindowMovement(event);
                     };
-                    app.addEventListener("mouseup", moveColumns);
-                    app.addEventListener("mouseleave", cancelColumnMovement);
+                    app.addEventListener("mouseup", moveWindows);
+                    app.addEventListener("mouseleave", cancelWindowMovement);
                 });
                 header.appendChild(handle);
 
@@ -907,7 +926,9 @@ class OmninoWindow extends HTMLElement {
         });
     }
     connectedCallback() {
-        this.parentElement.windowAdded();
+        if (!this.ismoving) {
+            this.parentElement.windowAdded();
+        }
     }
 }
 customElements.define('omnino-win', OmninoWindow);
