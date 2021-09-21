@@ -768,7 +768,9 @@ class OmninoWindow extends HTMLElement {
                         // Compute the position of the mouse event relative to OmninoApplication.
                         const rect = mouseUpEvent.currentTarget.getBoundingClientRect();
                         const dy = mouseUpEvent.clientY - mouseDownEvent.clientY;
+                        // x is the horizontal position of the mouseup event relative to the omnino-app
                         const x = clamp(0, mouseUpEvent.clientX - rect.left - mouseOffsetX); //x position within the element, offset by the mouse.
+                        // y is the vertical position of the mouseup event relative to the omnino-app
                         const y = mouseUpEvent.clientY - rect.top - mouseOffsetY;
 
                         const minHeight = app.minColumnWidth;
@@ -806,8 +808,10 @@ class OmninoWindow extends HTMLElement {
                                 const shrinkidx = elementIndex(shrinkwin);
                                 const growidx = elementIndex(growwin);
     
-                                const a = srcleft.getBoundingClientRect().top - omninocol.getTop();
-                                const b = srcwin.getBoundingClientRect().top - omninocol.getTop() + srcwin.getBoundingClientRect().height;
+                                // a is the position of the previous window relative to the omnino-app
+                                const a = srcleft.getBoundingClientRect().top - rect.top;
+                                // b is the position of srcwin's bottom edge relative to the omnino-app
+                                const b = srcwin.getBoundingClientRect().top - rect.top + srcwin.getBoundingClientRect().height;
                                 const newWindowY = clamp(a + minHeight, y, b - minHeight);
                                 if (newWindowY !== undefined) {
                                     const dy = oldWindowY - newWindowY;
@@ -825,7 +829,28 @@ class OmninoWindow extends HTMLElement {
                                 omninowin.removeWindow();
                                 dstcol.addWindow(omninowin);
                             } else {
+                                omninowin.removeWindow();
                                 // TODO: Insert the window among the others in dstcol.
+                                // TODO: Find a suitable position between the top and bottom of dstwin
+                                // a is the position of dstwin's top edge relative to the omnino-app
+                                const a = dstwin.getBoundingClientRect().top;
+                                // b is the position of dstwin's bottom edge relative to the omnino-app
+                                const b = dstwin.getBoundingClientRect().top + dstwin.getBoundingClientRect().height;
+                                const mid = clamp(a + minHeight, y, b - minHeight);
+                                if (mid !== undefined) {
+                                    const dy = mid - a;
+                                    const heightPct = fixPrecision(Math.abs(dy * 100 / columnHeight));
+                                    const dstidx = elementIndex(dstwin);
+                                    const oldDstWindowHeightPct = dstcol.windows[dstidx];
+                                    // Set dstwin's height to mid - a as a percentage of the column's window container
+                                    dstcol.windows[dstidx] = fixPrecision(heightPct);
+                                    // TODO: srcwin's height is set to b - mid as a percentage of the column's window container
+                                    dstcol.windows.splice(dstidx+1, 0, fixPrecision(oldDstWindowHeightPct - heightPct));
+                                    // TODO: srcwin is inserted after dstwin
+                                    this.ismoving = true;
+                                    dstcol.insertBefore(srcwin, dstwin.nextElementSibling);
+                                    this.ismoving = false;
+                                }
                             }
                         } else {
                             const neighborcol = srcleft ? srcleft : (srcright ? srcright : null);
@@ -869,6 +894,7 @@ class OmninoWindow extends HTMLElement {
                             }
                         }
                         omninocol.updateWindows();
+                        dstcol.updateWindows();
                         cancelWindowMovement(event);
                     };
                     app.addEventListener("mouseup", moveWindows);

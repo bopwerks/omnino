@@ -35,10 +35,10 @@ body {
     --omnino-link-hover-color: #1c1c1c;
     --omnino-link-active-color: #101010;
 
-    --omnino-handle-color: #569cd6;
     --omnino-handle-color: #dc5236;
     --omnino-handle-color: #eda946;
     --omnino-handle-color: #7cb52f;
+    --omnino-handle-color: #569cd6;
 }
 
 a {
