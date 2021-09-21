@@ -322,6 +322,9 @@ const clamp = (a, x, b) => {
     if (a > b) {
         return undefined;
     }
+    if (b === undefined) {
+        b = x;
+    }
     if (x < a) {
         return a;
     } else if (x > b) {
@@ -530,6 +533,16 @@ class OmninoColumn extends HTMLElement {
         shadow.appendChild(column);
         this.setMenu(this.menu);
     }
+    getHeight() {
+        const windows = this.shadowRoot.querySelector(".windows");
+        const rect = windows.getBoundingClientRect();
+        return rect.height;
+    }
+    getTop() {
+        const windows = this.shadowRoot.querySelector(".windows");
+        const rect = windows.getBoundingClientRect();
+        return rect.top;
+    }
     removeColumn() {
         const app = this.parentNode;
         const i = elementIndex(this);
@@ -592,16 +605,26 @@ class OmninoColumn extends HTMLElement {
             // Reduce the rightmost column width by half.
             // Set the new column equal to this width.
             const lastWindowHeight = this.windows.pop();
-            const newWindowHeight = lastWindowHeight / 2;
+            const newLastWindowHeight = fixPrecision(lastWindowHeight * 0.63);
+            const newWindowHeight = fixPrecision(lastWindowHeight - newLastWindowHeight);
+            this.windows.push(newLastWindowHeight);
             this.windows.push(newWindowHeight);
-            this.windows.push(newWindowHeight);
-            const totalHeight = this.windows.reduce((acc, cur) => acc + cur, 0);
-            console.assert((this.windows.length > 0 && totalHeight === 100) || (this.windows.length === 0 && totalHeight === 0));
-            const style = this.windows.map(percentage => `${percentage}%`).join(' ');
-            windows.style.gridTemplateRows = style;
+            this.updateWindows();
+            // const totalHeight = this.windows.reduce((acc, cur) => acc + cur, 0);
+            // console.assert((this.windows.length > 0 && totalHeight === 100) || (this.windows.length === 0 && totalHeight === 0));
+            // const style = this.windows.map(percentage => `${percentage}%`).join(' ');
+            // windows.style.gridTemplateRows = style;
             //console.log(`Column ${elementIndex(this)+1} Windows: ${style}`)
         }
         this.updateColor();
+    }
+    updateWindows() {
+        const windows = this.shadowRoot.querySelector(".windows");
+        const totalHeight = this.windows.reduce((acc, cur) => acc + cur, 0);
+        console.assert((this.windows.length > 0 && totalHeight === 100) || (this.windows.length === 0 && totalHeight === 0));
+        const style = this.windows.map(percentage => `${percentage}%`).join(' ');
+        windows.style.gridTemplateRows = style;
+        console.log(`Window %s: ${this.windows} Sum = ${totalHeight}`);
     }
     updateColor() {
         // When a column has no windows, fill it with a background color. Otherwise,
@@ -631,14 +654,15 @@ class OmninoColumn extends HTMLElement {
             const h2 = this.windows[i];
             this.windows.splice(i-1, 2, h1+h2);
         }
-        const totalHeight = this.windows.reduce((acc, cur) => acc + cur, 0);
-        console.assert((this.windows.length > 0 && totalHeight === 100) || (this.windows.length === 0 && totalHeight === 0));
         this.removeChild(win);
-        const style = this.windows.map(percentage => `${percentage}%`).join(' ');
-        const windows = this.shadowRoot.querySelector(".windows");
-        console.assert(windows);
-        // console.log(`Column ${elementIndex(this)+1} Windows: ${style}`);
-        windows.style.gridTemplateRows = style;
+        // const totalHeight = this.windows.reduce((acc, cur) => acc + cur, 0);
+        // console.assert((this.windows.length > 0 && totalHeight === 100) || (this.windows.length === 0 && totalHeight === 0));
+        // const style = this.windows.map(percentage => `${percentage}%`).join(' ');
+        // const windows = this.shadowRoot.querySelector(".windows");
+        // console.assert(windows);
+        // // console.log(`Column ${elementIndex(this)+1} Windows: ${style}`);
+        // windows.style.gridTemplateRows = style;
+        this.updateWindows();
         this.updateColor();
     }
     connectedCallback() {
@@ -720,7 +744,7 @@ class OmninoWindow extends HTMLElement {
                     // console.log(`Source column left: ${colrect.left}`);
                     // console.log(`Mouse X: ${mouseDownEvent.clientX}`);
                     // The position of the column relative to the OmninoApplication.
-                    // const oldColumnX = colrect.left - apprect.left;
+                    const oldWindowY = winrect.top - apprect.top;
                     // The position of the mousedown event relative to the OmninoApplication.
                     // const mouseDownX = mouseDownEvent.clientX - apprect.left;
                     // The x displacement from the top-left corner of the column to the mouse.
@@ -743,15 +767,15 @@ class OmninoWindow extends HTMLElement {
                     const moveWindows = mouseUpEvent => {
                         // Compute the position of the mouse event relative to OmninoApplication.
                         const rect = mouseUpEvent.currentTarget.getBoundingClientRect();
-                        const dx = mouseUpEvent.clientX - mouseDownEvent.clientX;
-                        const x = mouseUpEvent.clientX - rect.left - mouseOffsetX; //x position within the element, offset by the mouse.
+                        const dy = mouseUpEvent.clientY - mouseDownEvent.clientY;
+                        const x = clamp(0, mouseUpEvent.clientX - rect.left - mouseOffsetX); //x position within the element, offset by the mouse.
                         const y = mouseUpEvent.clientY - rect.top - mouseOffsetY;
 
-                        const minWidth = app.minColumnWidth;
-                        const appWidth = app.getBoundingClientRect().width;
+                        const minHeight = app.minColumnWidth;
+                        const columnHeight = omninocol.getHeight();
 
                         // Determine in which column and window the mouseup event occured.
-                        let dstcol = null;
+                        let dstcol = app.children[0];
                         for (let i = 0, w = 0; i < app.children.length && w < x; ++i) {
                             dstcol = app.children[i];
                             const r = dstcol.getBoundingClientRect();
@@ -776,23 +800,23 @@ class OmninoWindow extends HTMLElement {
                         const isMove = (dstcol !== srccol);
                         
                         if (isResize) {
-                            const shrinkcol = (dx < 0) ? srcleft : srccol;
-                            const growcol = (dx < 0) ? srccol : srcleft;
-                            if (shrinkcol !== null && growcol !== null) {
-                                const shrinkidx = elementIndex(shrinkcol);
-                                const growidx = elementIndex(growcol);
+                            const shrinkwin = (dy < 0) ? srcleft : srcwin;
+                            const growwin = (dy < 0) ? srcwin : srcleft;
+                            if (shrinkwin !== null && growwin !== null) {
+                                const shrinkidx = elementIndex(shrinkwin);
+                                const growidx = elementIndex(growwin);
     
-                                const a = srcleft.offsetLeft - apprect.left;
-                                const b = srccol.offsetLeft - apprect.left + srccol.offsetWidth;
-                                const newColumnX = clamp(a + minWidth, x, b - minWidth);
-                                if (newColumnX !== undefined) {
-                                    const dx = oldColumnX - newColumnX;
+                                const a = srcleft.getBoundingClientRect().top - omninocol.getTop();
+                                const b = srcwin.getBoundingClientRect().top - omninocol.getTop() + srcwin.getBoundingClientRect().height;
+                                const newWindowY = clamp(a + minHeight, y, b - minHeight);
+                                if (newWindowY !== undefined) {
+                                    const dy = oldWindowY - newWindowY;
                                     // console.log(`Dx: ${dx}`);
                                 
                                     // Grow and shrink columns by dx
-                                    const widthPct = fixPrecision(Math.abs(dx * 100 / appWidth));
-                                    app.columns[shrinkidx] = fixPrecision(app.columns[shrinkidx] - widthPct);
-                                    app.columns[growidx] = fixPrecision(app.columns[growidx] + widthPct);
+                                    const heightPct = fixPrecision(Math.abs(dy * 100 / columnHeight));
+                                    omninocol.windows[shrinkidx] = fixPrecision(omninocol.windows[shrinkidx] - heightPct);
+                                    omninocol.windows[growidx] = fixPrecision(omninocol.windows[growidx] + heightPct);
                                 }
                             }
                         } else if (isMove) {
@@ -844,7 +868,7 @@ class OmninoWindow extends HTMLElement {
                                 this.ismoving = false;
                             }
                         }
-                        app.updateColumns();
+                        omninocol.updateWindows();
                         cancelWindowMovement(event);
                     };
                     app.addEventListener("mouseup", moveWindows);
