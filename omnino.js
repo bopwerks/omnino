@@ -537,16 +537,9 @@ const resize = (srcchild, app, p, position, distance, minDistance, containerDist
 class OmninoWindow extends HTMLElement {
     constructor() {
         super();
-        const shadow = this.attachShadow({mode: 'open'});
-        this.menu = [
-            {
-                title: "Delwin",
-                link: this.removeWindow.bind(this),
-            },
-        ];
-
-        const style = document.createElement("style");
-        style.textContent = `
+        const shadow = this.attachShadow({mode: 'open'});     
+        shadow.innerHTML = `
+        <style>
         ${commonStyles}
         div.window { display: flex; flex: 1 1 auto; flex-flow: column; min-width: 0; min-height: 17px; background-color: inherit; }
         div.body { flex: 1 0 0; margin: 0; padding: var(--omnino-window-padding, 0 1em 1em 1em); direction: rtl; min-height: 0; overflow-y: scroll; overflow-x: auto; display: flex; flex-flow: column; }
@@ -554,160 +547,148 @@ class OmninoWindow extends HTMLElement {
         div.handle { cursor: move; }
         :host { border-top: 2px solid var(--omnino-border-color, black); display: flex; flex-flow: column; }
         :host(:first-of-type) { border-top: none; }
+        </style>
+        <div class="window">
+            <div class="header">
+                <div class="handle"></div>
+                <nav></nav>
+            </div>
+            <div class="body">
+                <div class="content">
+                    <slot></slot>
+                </div>
+            </div>
+        </div>
         `;
-        shadow.appendChild(style);
-
         const srcchild = this;
-        const window = document.createElement("div");
-        window.classList.add("window");
-        {
-            const header = document.createElement("div");
-            header.classList.add("header");
-            header.style.gridTemplateColumns = `${getScrollbarWidth()}px 1fr`;
-            {
-                const handle = document.createElement("div");
-                handle.classList.add("handle");
-                handle.addEventListener("mousedown", mouseDownEvent => {
-                    // Compute offset of mouse from the top left of the column.
-                    const omninocol = srcchild.parentElement;
-                    const app = omninocol.parentElement;
-                    // The position of the mousedown event relative to the OmninoApplication.
-                    // The x displacement from the top-left corner of the column to the mouse.
-                    const mouseOffsetX = mouseDownEvent.clientX - eleft(srcchild);
-                    const mouseOffsetY = mouseDownEvent.clientY - etop(srcchild);
+        const handle = shadow.querySelector(".handle");
+        handle.addEventListener("mousedown", mouseDownEvent => {
+            // Compute offset of mouse from the top left of the column.
+            const omninocol = srcchild.parentElement;
+            const app = omninocol.parentElement;
+            // The position of the mousedown event relative to the OmninoApplication.
+            // The x displacement from the top-left corner of the column to the mouse.
+            const mouseOffsetX = mouseDownEvent.clientX - eleft(srcchild);
+            const mouseOffsetY = mouseDownEvent.clientY - etop(srcchild);
 
-                    // Store the offset in the parent to be used by its mouseup handler.
-                    app.style.cursor = "move";
-                    app.style.userSelect = "none";
+            // Store the offset in the parent to be used by its mouseup handler.
+            app.style.cursor = "move";
+            app.style.userSelect = "none";
 
-                    // TODO: Add mouseup handler
-                    const cancelMoveChild = event => {
-                        app.removeEventListener("mouseup", moveChild);
-                        app.style.cursor = "default";
-                        app.style.userSelect = "auto";
-                        app.removeEventListener("mouseleave", cancelMoveChild);
-                    };
-                    const moveChild = mouseUpEvent => {
-                        // Compute the position of the mouse event relative to OmninoApplication.
-                        const rect = mouseUpEvent.currentTarget.getBoundingClientRect();
-                        const dd = mouseUpEvent.clientY - mouseDownEvent.clientY;
-                        // x is the horizontal position of the mouseup event relative to the omnino-app
-                        const x = clamp(0, mouseUpEvent.clientX - rect.left - mouseOffsetX); //x position within the element, offset by the mouse.
-                        // y is the vertical position of the mouseup event relative to the omnino-app
-                        const y = mouseUpEvent.clientY - rect.top - mouseOffsetY;
+            // TODO: Add mouseup handler
+            const cancelMoveChild = event => {
+                app.removeEventListener("mouseup", moveChild);
+                app.style.cursor = "default";
+                app.style.userSelect = "auto";
+                app.removeEventListener("mouseleave", cancelMoveChild);
+            };
+            const moveChild = mouseUpEvent => {
+                // Compute the position of the mouse event relative to OmninoApplication.
+                const rect = mouseUpEvent.currentTarget.getBoundingClientRect();
+                const dd = mouseUpEvent.clientY - mouseDownEvent.clientY;
+                // x is the horizontal position of the mouseup event relative to the omnino-app
+                const x = clamp(0, mouseUpEvent.clientX - rect.left - mouseOffsetX); //x position within the element, offset by the mouse.
+                // y is the vertical position of the mouseup event relative to the omnino-app
+                const y = mouseUpEvent.clientY - rect.top - mouseOffsetY;
 
-                        const minDistance = app.minColumnWidth;
-                        const containerDistance = omninocol.getHeight();
+                const minDistance = app.minColumnWidth;
+                const containerDistance = omninocol.getHeight();
 
-                        // Determine in which column and window the mouseup event occured.
-                        let dstcol = app.children[0];
-                        for (let i = 0, w = 0; i < app.children.length && w < x; ++i) {
-                            dstcol = app.children[i];
-                            const r = dstcol.getBoundingClientRect();
-                            w += r.width;
-                        }
-                        console.assert(dstcol !== null);
-
-                        let dstchild = null;
-                        for (let i = 0, h = 0; i < dstcol.children.length && h < y; ++i) {
-                            dstchild = dstcol.children[i];
-                            const r = dstchild.getBoundingClientRect();
-                            h += r.height;
-                        }
-
-                        const srccol = omninocol;
-                        const srcleft = srcchild.previousElementSibling;
-                        const srcright = srcchild.nextElementSibling;
-                        const isResize = (dstcol === srccol && (srcchild === dstchild || (srcleft !== null && dstchild === srcleft)));
-                        const isMove = (dstcol !== srccol);
-                        const isExchange = (dstcol === srccol && dstchild !== null);
-                        const sizes = omninocol.windows;
-                        
-                        if (isResize) {
-                            resize(srcchild, app, y, etop, eheight, minDistance, containerDistance, dd, sizes);
-                        } else if (isMove) {
-                            const destinationColumnIsEmpty = (dstchild === null);
-                            if (destinationColumnIsEmpty) {
-                                srcchild.removeWindow();
-                                dstcol.addWindow(srcchild);
-                            } else {
-                                srcchild.removeWindow();
-                                // a is the position of dstchild's top edge relative to the omnino-app
-                                const a = etop(dstchild);
-                                // b is the position of dstchild's bottom edge relative to the omnino-app
-                                const b = etop(dstchild) + eheight(dstchild);
-                                const mid = clamp(a + minDistance, y, b - minDistance);
-                                if (mid !== undefined) {
-                                    const dd = mid - a;
-                                    const heightPct = fixPrecision(Math.abs(dd * 100 / containerDistance));
-                                    const dstidx = elementIndex(dstchild);
-                                    const oldDstWindowHeightPct = dstcol.windows[dstidx];
-                                    // Set dstchild's height to mid - a as a percentage of the column's window container
-                                    dstcol.windows[dstidx] = fixPrecision(heightPct);
-                                    // TODO: srcchild's height is set to b - mid as a percentage of the column's window container
-                                    dstcol.windows.splice(dstidx+1, 0, fixPrecision(oldDstWindowHeightPct - heightPct));
-                                    // TODO: srcchild is inserted after dstchild
-                                    this.ismoving = true;
-                                    dstcol.insertBefore(srcchild, dstchild.nextElementSibling);
-                                    this.ismoving = false;
-                                }
-                            }
-                        } else if (isExchange) {
-                            const neighborwin = srcleft ? srcleft : (srcright ? srcright : null);
-
-                            const srcidx = elementIndex(srcchild);
-                            const dstidx = elementIndex(dstchild);
-                            const neighboridx = neighborwin ? elementIndex(neighborwin) : -1;
-
-                            const oldSrcWindowHeightPct = sizes[srcidx];
-                            const oldDstWindowHeightPct = sizes[dstidx];
-                            const a = etop(dstchild) - etop(app);
-                            const b = etop(dstchild) - etop(app) + eheight(dstchild);
-                            const newChildPos = clamp(a + minDistance, y, b - minDistance);
-                            if (newChildPos !== undefined) {
-                                // Make room for the source column in the dest column and grow the neighbor column
-                                const newSrcWindowHeight = b - newChildPos;
-                                const newSrcWindowHeightPct = fixPrecision(newSrcWindowHeight * 100 / containerDistance);
-                                const newDstWindowHeightPct = fixPrecision(oldDstWindowHeightPct - newSrcWindowHeightPct);
-                                sizes[srcidx] = newSrcWindowHeightPct;
-                                sizes[dstidx] = newDstWindowHeightPct;
-                                if (neighboridx >= 0) {
-                                    sizes[neighboridx] = fixPrecision(sizes[neighboridx] + oldSrcWindowHeightPct);
-                                }
-                                // Move source window after dest window
-                                moveElement(sizes, srcidx, dstidx+1);
-                                this.ismoving = true;
-                                dstcol.insertBefore(srcchild, dstchild.nextElementSibling);
-                                this.ismoving = false;
-                            }
-                        }
-                        omninocol.updateWindows();
-                        dstcol.updateWindows();
-                        cancelMoveChild(event);
-                    };
-                    app.addEventListener("mouseup", moveChild);
-                    app.addEventListener("mouseleave", cancelMoveChild);
-                });
-                header.appendChild(handle);
-
-                const nav = document.createElement("nav");
-                {
+                // Determine in which column and window the mouseup event occured.
+                let dstcol = app.children[0];
+                for (let i = 0, w = 0; i < app.children.length && w < x; ++i) {
+                    dstcol = app.children[i];
+                    const r = dstcol.getBoundingClientRect();
+                    w += r.width;
                 }
-                header.appendChild(nav);
-            }
-            window.appendChild(header);
+                console.assert(dstcol !== null);
 
-            const body = document.createElement("div");
-            body.classList.add("body");
+                let dstchild = null;
+                for (let i = 0, h = 0; i < dstcol.children.length && h < y; ++i) {
+                    dstchild = dstcol.children[i];
+                    const r = dstchild.getBoundingClientRect();
+                    h += r.height;
+                }
+
+                const srccol = omninocol;
+                const srcleft = srcchild.previousElementSibling;
+                const srcright = srcchild.nextElementSibling;
+                const isResize = (dstcol === srccol && (srcchild === dstchild || (srcleft !== null && dstchild === srcleft)));
+                const isMove = (dstcol !== srccol);
+                const isExchange = (dstcol === srccol && dstchild !== null);
+                const sizes = omninocol.windows;
+                
+                if (isResize) {
+                    resize(srcchild, app, y, etop, eheight, minDistance, containerDistance, dd, sizes);
+                } else if (isMove) {
+                    const destinationColumnIsEmpty = (dstchild === null);
+                    if (destinationColumnIsEmpty) {
+                        srcchild.removeWindow();
+                        dstcol.addWindow(srcchild);
+                    } else {
+                        srcchild.removeWindow();
+                        // a is the position of dstchild's top edge relative to the omnino-app
+                        const a = etop(dstchild);
+                        // b is the position of dstchild's bottom edge relative to the omnino-app
+                        const b = etop(dstchild) + eheight(dstchild);
+                        const mid = clamp(a + minDistance, y, b - minDistance);
+                        if (mid !== undefined) {
+                            const dd = mid - a;
+                            const heightPct = fixPrecision(Math.abs(dd * 100 / containerDistance));
+                            const dstidx = elementIndex(dstchild);
+                            const oldDstWindowHeightPct = dstcol.windows[dstidx];
+                            // Set dstchild's height to mid - a as a percentage of the column's window container
+                            dstcol.windows[dstidx] = fixPrecision(heightPct);
+                            // TODO: srcchild's height is set to b - mid as a percentage of the column's window container
+                            dstcol.windows.splice(dstidx+1, 0, fixPrecision(oldDstWindowHeightPct - heightPct));
+                            // TODO: srcchild is inserted after dstchild
+                            this.ismoving = true;
+                            dstcol.insertBefore(srcchild, dstchild.nextElementSibling);
+                            this.ismoving = false;
+                        }
+                    }
+                } else if (isExchange) {
+                    const neighborwin = srcleft ? srcleft : (srcright ? srcright : null);
+
+                    const srcidx = elementIndex(srcchild);
+                    const dstidx = elementIndex(dstchild);
+                    const neighboridx = neighborwin ? elementIndex(neighborwin) : -1;
+
+                    const oldSrcWindowHeightPct = sizes[srcidx];
+                    const oldDstWindowHeightPct = sizes[dstidx];
+                    const a = etop(dstchild) - etop(app);
+                    const b = etop(dstchild) - etop(app) + eheight(dstchild);
+                    const newChildPos = clamp(a + minDistance, y, b - minDistance);
+                    if (newChildPos !== undefined) {
+                        // Make room for the source column in the dest column and grow the neighbor column
+                        const newSrcWindowHeight = b - newChildPos;
+                        const newSrcWindowHeightPct = fixPrecision(newSrcWindowHeight * 100 / containerDistance);
+                        const newDstWindowHeightPct = fixPrecision(oldDstWindowHeightPct - newSrcWindowHeightPct);
+                        sizes[srcidx] = newSrcWindowHeightPct;
+                        sizes[dstidx] = newDstWindowHeightPct;
+                        if (neighboridx >= 0) {
+                            sizes[neighboridx] = fixPrecision(sizes[neighboridx] + oldSrcWindowHeightPct);
+                        }
+                        // Move source window after dest window
+                        moveElement(sizes, srcidx, dstidx+1);
+                        this.ismoving = true;
+                        dstcol.insertBefore(srcchild, dstchild.nextElementSibling);
+                        this.ismoving = false;
+                    }
+                }
+                omninocol.updateWindows();
+                dstcol.updateWindows();
+                cancelMoveChild(event);
+            };
+            app.addEventListener("mouseup", moveChild);
+            app.addEventListener("mouseleave", cancelMoveChild);
+        });
+        this.menu = [
             {
-                const content = document.createElement("div");
-                content.classList.add("content");
-                content.innerHTML = `<slot></slot>`;
-                body.appendChild(content);
-            }
-            window.appendChild(body);
-        }
-        shadow.appendChild(window);
+                title: "Delwin",
+                link: this.removeWindow.bind(this),
+            },
+        ];   
         this.setMenu(this.menu);
     }
     removeWindow() {
