@@ -248,129 +248,109 @@ class OmninoColumn extends HTMLElement {
             },
         ];
         const shadow = this.attachShadow({mode: 'open'});
-
-        const style = document.createElement("style");
-        style.textContent = `
+        shadow.innerHTML = `
+        <style>
         ${commonStyles}
-        div.header { border-bottom-width: 2px; }
+        div.header { border-bottom-width: 2px; grid-template-columns: ${getScrollbarWidth()}px 1fr; }
         div.column { display: flex; flex-flow: column; height: 100%; min-width: 0; background: var(--omnino-background-color, white); }
         div.windows { flex: 1 1 auto; display: grid; min-width: 0; grid-template-rows: 100%; }
         div.handle { cursor: move; }
         :host { border-left: 2px solid var(--omnino-border-color, black); }
         :host(:first-of-type) { border-left: none; }
+        </style>
+        <div class="column">
+            <div class="header">
+                <div class="handle"></div>
+                <nav></nav>
+            </div>
+            <div class="windows">
+                <slot></slot>
+            </div>
+        </div>
         `;
-        shadow.appendChild(style);
-
         const omninocol = this;
-        const column = document.createElement("div");
-        column.classList.add("column");
-        {
-            const header = document.createElement("div");
-            header.classList.add("header");
-            header.style.gridTemplateColumns = `${getScrollbarWidth()}px 1fr`;
+        const handle = shadow.querySelector(".handle");
+        handle.addEventListener("mousedown", mouseDownEvent => {
+            // Compute offset of mouse from the top left of the column.
+            const app = omninocol.parentElement;
+            const colrect = omninocol.getBoundingClientRect();
+            // The position of the mousedown event relative to the OmninoApplication.
+            const mouseDownX = mouseDownEvent.clientX - eleft(app);
+            // The x displacement from the top-left corner of the column to the mouse.
+            const mouseOffsetX = mouseDownEvent.clientX - colrect.left;
 
-            const windows = document.createElement("div");
-            windows.classList.add("windows");
-            windows.innerHTML = `<slot></slot>`;
-            windows.style.gridTemplateRows = "100%";
-            {
-                const handle = document.createElement("div");
-                handle.classList.add("handle");
-                handle.addEventListener("mousedown", mouseDownEvent => {
-                    // Compute offset of mouse from the top left of the column.
-                    const app = omninocol.parentElement;
-                    const colrect = omninocol.getBoundingClientRect();
-                    // The position of the mousedown event relative to the OmninoApplication.
-                    const mouseDownX = mouseDownEvent.clientX - eleft(app);
-                    // The x displacement from the top-left corner of the column to the mouse.
-                    const mouseOffsetX = mouseDownEvent.clientX - colrect.left; //x position within the element.
+            // Store the offset in the parent to be used by its mouseup handler.
+            app.style.cursor = "move";
+            app.style.userSelect = "none";
 
-                    // Store the offset in the parent to be used by its mouseup handler.
-                    app.style.cursor = "move";
-                    app.style.userSelect = "none";
+            const cancelMoveChild = event => {
+                app.removeEventListener("mouseup", moveChild);
+                app.style.cursor = "default";
+                app.style.userSelect = "auto";
+                app.removeEventListener("mouseleave", cancelMoveChild);
+            };
+            const moveChild = mouseUpEvent => {
+                // Compute the position of the mouse event relative to OmninoApplication.
+                const rect = mouseUpEvent.currentTarget.getBoundingClientRect();
+                const dd = mouseUpEvent.clientX - mouseDownEvent.clientX;
+                const x = mouseUpEvent.clientX - rect.left - mouseOffsetX; //x position within the element, offset by the mouse.
 
-                    // TODO: Add mouseup handler
-                    const cancelMoveChild = event => {
-                        app.removeEventListener("mouseup", moveChild);
-                        app.style.cursor = "default";
-                        app.style.userSelect = "auto";
-                        app.removeEventListener("mouseleave", cancelMoveChild);
-                    };
-                    const moveChild = mouseUpEvent => {
-                        // Compute the position of the mouse event relative to OmninoApplication.
-                        const rect = mouseUpEvent.currentTarget.getBoundingClientRect();
-                        const dd = mouseUpEvent.clientX - mouseDownEvent.clientX;
-                        const x = mouseUpEvent.clientX - rect.left - mouseOffsetX; //x position within the element, offset by the mouse.
+                const minDistance = app.minColumnWidth;
+                const containerDistance = app.getBoundingClientRect().width;
 
-                        const minDistance = app.minColumnWidth;
-                        const containerDistance = app.getBoundingClientRect().width;
-
-                        // Determine in which column the current mouse x-position would fall.
-                        let dstcol = null;
-                        for (let i = 0, w = 0; i < app.children.length && w < x; ++i) {
-                            dstcol = app.children[i];
-                            const r = dstcol.getBoundingClientRect();
-                            w += r.width;
-                        }
-                        console.assert(dstcol !== null);
-
-                        const srcchild = omninocol;
-                        const srcleft = srcchild.previousElementSibling;
-                        const srcright = srcchild.nextElementSibling;
-                        const isResize = (dstcol === srcchild || (srcleft !== null && dstcol === srcleft));
-                        const sizes = app.columns;
-                        
-                        if (isResize) {
-                            resize(srcchild, app, x, eleft, ewidth, minDistance, containerDistance, dd, sizes);
-                        } else {
-                            const neighborcol = srcleft ? srcleft : (srcright ? srcright : null);
-
-                            const srcidx = elementIndex(srcchild);
-                            const dstidx = elementIndex(dstcol);
-                            const neighboridx = neighborcol ? elementIndex(neighborcol) : -1;
-
-                            // TODO: Find x coordinate of moved column's new position
-                            const oldSrcColumnWidthPct = sizes[srcidx];
-                            const oldDstColumnWidthPct = sizes[dstidx];
-                            const a = dstcol.offsetLeft - eleft(app);
-                            const b = dstcol.offsetLeft - eleft(app) + dstcol.offsetWidth;
-                            const newChildPos = clamp(a + minDistance, x, b - minDistance);
-                            if (newChildPos !== undefined) {
-                                // Make room for the source column in the dest column and grow the neighbor column
-                                const newSrcColumnWidth = b - newChildPos;
-                                const newSrcColumnWidthPct = fixPrecision(Math.abs(newSrcColumnWidth * 100 / containerDistance));
-                                const newDstColumnWidthPct = fixPrecision(oldDstColumnWidthPct - newSrcColumnWidthPct);
-                                sizes[srcidx] = newSrcColumnWidthPct;
-                                sizes[dstidx] = newDstColumnWidthPct;
-                                if (neighboridx >= 0) {
-                                    sizes[neighboridx] = fixPrecision(sizes[neighboridx] + oldSrcColumnWidthPct);
-                                }
-                                // Move source column after dest column
-                                moveElement(sizes, srcidx, dstidx+1);
-                                this.ismoving = true;
-                                app.insertBefore(srcchild, dstcol.nextElementSibling);
-                                this.ismoving = false;
-                            }
-                        }
-                        app.updateColumns();
-                        cancelMoveChild(event);
-                    };
-                    app.addEventListener("mouseup", moveChild);
-                    app.addEventListener("mouseleave", cancelMoveChild);
-                });
-                header.appendChild(handle);
-
-                const nav = document.createElement("nav");
-                {
-                    // const title = document.createElement("h2");
-                    // nav.appendChild(title);
+                // Determine in which column the current mouse x-position would fall.
+                let dstcol = null;
+                for (let i = 0, w = 0; i < app.children.length && w < x; ++i) {
+                    dstcol = app.children[i];
+                    const r = dstcol.getBoundingClientRect();
+                    w += r.width;
                 }
-                header.appendChild(nav);
-            }
-            column.appendChild(header);
-            column.appendChild(windows);
-        }
-        shadow.appendChild(column);
+                console.assert(dstcol !== null);
+
+                const srcchild = omninocol;
+                const srcleft = srcchild.previousElementSibling;
+                const srcright = srcchild.nextElementSibling;
+                const isResize = (dstcol === srcchild || (srcleft !== null && dstcol === srcleft));
+                const sizes = app.columns;
+                
+                if (isResize) {
+                    resize(srcchild, app, x, eleft, ewidth, minDistance, containerDistance, dd, sizes);
+                } else {
+                    const neighborcol = srcleft ? srcleft : (srcright ? srcright : null);
+
+                    const srcidx = elementIndex(srcchild);
+                    const dstidx = elementIndex(dstcol);
+                    const neighboridx = neighborcol ? elementIndex(neighborcol) : -1;
+
+                    // TODO: Find x coordinate of moved column's new position
+                    const oldSrcColumnWidthPct = sizes[srcidx];
+                    const oldDstColumnWidthPct = sizes[dstidx];
+                    const a = dstcol.offsetLeft - eleft(app);
+                    const b = dstcol.offsetLeft - eleft(app) + dstcol.offsetWidth;
+                    const newChildPos = clamp(a + minDistance, x, b - minDistance);
+                    if (newChildPos !== undefined) {
+                        // Make room for the source column in the dest column and grow the neighbor column
+                        const newSrcColumnWidth = b - newChildPos;
+                        const newSrcColumnWidthPct = fixPrecision(Math.abs(newSrcColumnWidth * 100 / containerDistance));
+                        const newDstColumnWidthPct = fixPrecision(oldDstColumnWidthPct - newSrcColumnWidthPct);
+                        sizes[srcidx] = newSrcColumnWidthPct;
+                        sizes[dstidx] = newDstColumnWidthPct;
+                        if (neighboridx >= 0) {
+                            sizes[neighboridx] = fixPrecision(sizes[neighboridx] + oldSrcColumnWidthPct);
+                        }
+                        // Move source column after dest column
+                        moveElement(sizes, srcidx, dstidx+1);
+                        this.ismoving = true;
+                        app.insertBefore(srcchild, dstcol.nextElementSibling);
+                        this.ismoving = false;
+                    }
+                }
+                app.updateColumns();
+                cancelMoveChild(mouseUpEvent);
+            };
+            app.addEventListener("mouseup", moveChild);
+            app.addEventListener("mouseleave", cancelMoveChild);
+        });
         this.setMenu(this.menu);
     }
     getHeight() {
