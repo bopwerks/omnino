@@ -232,6 +232,17 @@ const moveElement = (arr, i, j) => {
     arr.splice((i < j) ? j-1 : j, 0, elt);
 }
 
+const reduceFirst = (arr, predicate, combine, initial) => {
+    let sum = initial;
+    let i = 0;
+    let rval = null;
+    for ( ; i < arr.length && !predicate(sum); ++i) {
+        rval = arr[i];
+        sum = combine(sum, arr[i]);
+    }
+    return rval;
+};
+
 class OmninoColumn extends HTMLElement {
     constructor() {
         super();
@@ -293,18 +304,12 @@ class OmninoColumn extends HTMLElement {
                 // Compute the position of the mouse event relative to OmninoApplication.
                 const rect = mouseUpEvent.currentTarget.getBoundingClientRect();
                 const dd = mouseUpEvent.clientX - mouseDownEvent.clientX;
-                const x = mouseUpEvent.clientX - rect.left - mouseOffsetX; //x position within the element, offset by the mouse.
+                const x = mouseUpEvent.clientX - rect.left - mouseOffsetX;
 
                 const minDistance = app.minColumnWidth;
                 const containerDistance = app.getBoundingClientRect().width;
 
-                // Determine in which column the current mouse x-position would fall.
-                let dstchild = null;
-                for (let i = 0, w = 0; i < app.children.length && w < x; ++i) {
-                    dstchild = app.children[i];
-                    const r = dstchild.getBoundingClientRect();
-                    w += r.width;
-                }
+                const dstchild = reduceFirst(app.children, w => w >= x, (a, b) => a + ewidth(b), 0);
                 console.assert(dstchild !== null);
 
                 const srcchild = omninocol;
@@ -556,7 +561,6 @@ class OmninoWindow extends HTMLElement {
             app.style.cursor = "move";
             app.style.userSelect = "none";
 
-            // TODO: Add mouseup handler
             const cancelMoveChild = event => {
                 app.removeEventListener("mouseup", moveChild);
                 app.style.cursor = "default";
@@ -567,29 +571,16 @@ class OmninoWindow extends HTMLElement {
                 // Compute the position of the mouse event relative to OmninoApplication.
                 const rect = mouseUpEvent.currentTarget.getBoundingClientRect();
                 const dd = mouseUpEvent.clientY - mouseDownEvent.clientY;
-                // x is the horizontal position of the mouseup event relative to the omnino-app
-                const x = clamp(0, mouseUpEvent.clientX - rect.left - mouseOffsetX); //x position within the element, offset by the mouse.
-                // y is the vertical position of the mouseup event relative to the omnino-app
+                const x = clamp(0, mouseUpEvent.clientX - rect.left - mouseOffsetX);
                 const y = mouseUpEvent.clientY - rect.top - mouseOffsetY;
 
                 const minDistance = app.minColumnWidth;
                 const containerDistance = omninocol.getHeight();
 
                 // Determine in which column and window the mouseup event occured.
-                let dstcol = app.children[0];
-                for (let i = 0, w = 0; i < app.children.length && w < x; ++i) {
-                    dstcol = app.children[i];
-                    const r = dstcol.getBoundingClientRect();
-                    w += r.width;
-                }
+                const dstcol = reduceFirst(app.children, w => w >= x, (a, b) => a + ewidth(b), 0);
                 console.assert(dstcol !== null);
-
-                let dstchild = null;
-                for (let i = 0, h = 0; i < dstcol.children.length && h < y; ++i) {
-                    dstchild = dstcol.children[i];
-                    const r = dstchild.getBoundingClientRect();
-                    h += r.height;
-                }
+                const dstchild = reduceFirst(dstcol.children, h => h >= y, (a, b) => a + eheight(b), 0);
 
                 const srccol = omninocol;
                 const srcleft = srcchild.previousElementSibling;
@@ -633,7 +624,7 @@ class OmninoWindow extends HTMLElement {
                 }
                 omninocol.updateWindows();
                 dstcol.updateWindows();
-                cancelMoveChild(event);
+                cancelMoveChild(mouseUpEvent);
             };
             app.addEventListener("mouseup", moveChild);
             app.addEventListener("mouseleave", cancelMoveChild);
