@@ -11,10 +11,6 @@ div.handle { background: var(--omnino-handle-color, #7C7ABD); }
 div.loading { background: linear-gradient(to left, #afadee, #eefdfd 100%); }
 `;
 
-const fixPrecision = n => {
-    return Math.round((n + Number.EPSILON) * 10000) / 10000;
-};
-
 class OmninoApplication extends HTMLElement {
     constructor() {
         super();
@@ -127,10 +123,11 @@ class OmninoApplication extends HTMLElement {
             columns.style.gridTemplateColumns = style;
         } else {
             const lastColumnWidth = this.columns.pop();
-            const newColumnWidth = fixPrecision(lastColumnWidth * 0.37);
-            const newLastColumnWidth = fixPrecision(lastColumnWidth - newColumnWidth);
+            const newColumnWidth = lastColumnWidth * 0.37;
+            const newLastColumnWidth = lastColumnWidth - newColumnWidth;
             this.columns.push(newLastColumnWidth);
             this.columns.push(newColumnWidth);
+            this.columns[this.columns.length-1] = reduceExcept(this.columns, (a, b) => a - b, 100, this.columns.length-1);
         }
         this.updateColumns();
         this.updateColor();
@@ -138,7 +135,7 @@ class OmninoApplication extends HTMLElement {
     updateColumns() {
         const columns = this.shadowRoot.querySelector(".columns");
         console.assert(columns);
-        const totalWidth = fixPrecision(this.columns.reduce(((acc, cur) => acc + cur), 0));
+        const totalWidth = this.columns.reduce(((acc, cur) => acc + cur), 0);
         console.assert((this.columns.length > 0 && totalWidth === 100) || (this.columns.length === 0 && totalWidth === 0));
         const style = this.columns.map(percentage => `${percentage}%`).join(' ');
         columns.style.gridTemplateColumns = style;
@@ -163,20 +160,15 @@ class OmninoApplication extends HTMLElement {
         } else if (i == 0) {
             const w1 = this.columns.shift();
             const w2 = this.columns.shift();
-            this.columns.unshift(fixPrecision(w1+w2));
+            this.columns.unshift(w1+w2);
         // Otherwise add width to the previous and remove.
         } else {
             const w1 = this.columns[i-1];
             const w2 = this.columns[i];
-            this.columns.splice(i-1, 2, fixPrecision(w1+w2));
+            this.columns.splice(i-1, 2, w1+w2);
         }
-        const totalWidth = fixPrecision(this.columns.reduce(((acc, cur) => acc + cur), 0));
-        console.assert((this.columns.length > 0 && totalWidth === 100) || (this.columns.length === 0 && totalWidth === 0));
         this.removeChild(col);
-        const style = this.columns.map(percentage => `${percentage}%`).join(' ');
-        const columns = this.shadowRoot.querySelector(".columns");
-        console.assert(columns);
-        columns.style.gridTemplateColumns = style;
+        this.updateColumns();
         this.updateColor();
     }
 }
@@ -393,10 +385,11 @@ class OmninoColumn extends HTMLElement {
             windows.style.gridTemplateColumns = style;
         } else {
             const lastWindowHeight = this.windows.pop();
-            const newLastWindowHeight = fixPrecision(lastWindowHeight * 0.63);
-            const newWindowHeight = fixPrecision(lastWindowHeight - newLastWindowHeight);
+            const newLastWindowHeight = lastWindowHeight * 0.63;
+            const newWindowHeight = lastWindowHeight - newLastWindowHeight;
             this.windows.push(newLastWindowHeight);
             this.windows.push(newWindowHeight);
+            this.windows[this.windows.length-1] = reduceExcept(this.windows, (a, b) => a - b, 100, this.windows.length-1);
             this.updateWindows();
         }
         this.updateColor();
@@ -483,13 +476,24 @@ const resize = (srcchild, app, p, position, distance, minDistance, containerDist
         if (newChildPos !== undefined) {
             const oldChildPos = position(srcchild) - position(app);
             const dd = oldChildPos - newChildPos;
-            const distPct = fixPrecision(Math.abs(dd * 100 / containerDistance));
+            const distPct = Math.abs(dd * 100 / containerDistance);
             const shrinkidx = elementIndex(shrinkChild);
             const growidx = elementIndex(growChild);
-            sizes[shrinkidx] = fixPrecision(sizes[shrinkidx] - distPct);
-            sizes[growidx] = fixPrecision(sizes[growidx] + distPct);
+            sizes[shrinkidx] -= distPct;
+            sizes[growidx] += distPct;
+            sizes[growidx] = reduceExcept(sizes, (a, b) => a - b, 100, growidx);
         }
     }
+};
+
+const reduceExcept = (arr, combine, initial, ...indices) => {
+    let total = initial;
+    for (let i = 0; i < arr.length; ++i) {
+        if (indices.indexOf(i) < 0) {
+            total = combine(total, arr[i]);
+        }
+    }
+    return total;
 };
 
 const exchange = (srcchild, dstchild, p, app, position, distance, minDistance, containerDistance, sizes) => {
@@ -505,14 +509,12 @@ const exchange = (srcchild, dstchild, p, app, position, distance, minDistance, c
     const b = position(dstchild) - position(app) + distance(dstchild);
     const newChildPos = clamp(a + minDistance, p, b - minDistance);
     if (newChildPos !== undefined) {
-        const newSrcChildDistance = b - newChildPos;
-        const newSrcChildDistancePct = fixPrecision(Math.abs(newSrcChildDistance * 100 / containerDistance));
-        const newDstChildDistancePct = fixPrecision(oldDstChildDistancePct - newSrcChildDistancePct);
-        sizes[srcidx] = newSrcChildDistancePct;
-        sizes[dstidx] = newDstChildDistancePct;
+        sizes[srcidx] = (b - newChildPos) * 100 / containerDistance;
+        sizes[dstidx] -= sizes[srcidx];
         if (neighboridx >= 0) {
-            sizes[neighboridx] = fixPrecision(sizes[neighboridx] + oldSrcChildDistancePct);
+            sizes[neighboridx] += oldSrcChildDistancePct;
         }
+        sizes[dstidx] = reduceExcept(sizes, (a, b) => a - b, 100, dstidx);
         moveElement(sizes, srcidx, dstidx+1);
         srcchild.ismoving = true;
         srcchild.parentElement.insertBefore(srcchild, dstchild.nextElementSibling);
@@ -594,26 +596,22 @@ class OmninoWindow extends HTMLElement {
                     resize(srcchild, app, y, etop, eheight, minDistance, containerDistance, dd, sizes);
                 } else if (isMove) {
                     const destinationColumnIsEmpty = (dstchild === null);
+                    srcchild.removeWindow();
                     if (destinationColumnIsEmpty) {
-                        srcchild.removeWindow();
                         dstcol.addWindow(srcchild);
                     } else {
-                        srcchild.removeWindow();
-                        // a is the position of dstchild's top edge relative to the omnino-app
                         const a = etop(dstchild);
-                        // b is the position of dstchild's bottom edge relative to the omnino-app
                         const b = etop(dstchild) + eheight(dstchild);
                         const mid = clamp(a + minDistance, y, b - minDistance);
                         if (mid !== undefined) {
                             const dd = mid - a;
-                            const heightPct = fixPrecision(Math.abs(dd * 100 / containerDistance));
+                            const heightPct = Math.abs(dd * 100 / containerDistance);
                             const dstidx = elementIndex(dstchild);
                             const oldDstWindowHeightPct = dstcol.windows[dstidx];
                             // Set dstchild's height to mid - a as a percentage of the column's window container
-                            dstcol.windows[dstidx] = fixPrecision(heightPct);
-                            // TODO: srcchild's height is set to b - mid as a percentage of the column's window container
-                            dstcol.windows.splice(dstidx+1, 0, fixPrecision(oldDstWindowHeightPct - heightPct));
-                            // TODO: srcchild is inserted after dstchild
+                            dstcol.windows[dstidx] = heightPct;
+                            dstcol.windows.splice(dstidx+1, 0, oldDstWindowHeightPct - heightPct);
+                            dstcol.windows[dstidx+1] = reduceExcept(dstcol.windows, (a, b) => a - b, 100, dstidx+1);
                             this.ismoving = true;
                             dstcol.insertBefore(srcchild, dstchild.nextElementSibling);
                             this.ismoving = false;
