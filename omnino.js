@@ -68,7 +68,6 @@ class OmninoApplication extends HTMLElement {
         this.setMenu(this.menu);
     }
     addColumn() {
-        // TODO: Verify that the rightmost column has 2*minDistance space
         const lastColumnPct = (this.columns.length > 0) ? this.columns[this.columns.length-1] : 100;
         const appWidth = this.getBoundingClientRect().width;
         const lastColumnWidth = lastColumnPct * appWidth / 100;
@@ -369,9 +368,16 @@ class OmninoColumn extends HTMLElement {
         });
     }
     addWindow(win) {
-        const newWindow = win ? win : document.createElement("omnino-win");
-        this.appendChild(newWindow);
-        return makeWindowProxy(newWindow);
+        const lastWindowPct = (this.windows.length > 0) ? this.windows[this.windows.length-1] : 100;
+        const columnHeight = this.getHeight();
+        const lastWindowHeight = lastWindowPct * columnHeight / 100;
+        const minDistance = 2 * 100;
+        if (lastWindowHeight > minDistance) {
+            const newWindow = win ? win : document.createElement("omnino-win");
+            this.appendChild(newWindow);
+            return makeWindowProxy(newWindow);
+        }
+        return null;
     }
     windowAdded() {
         // windowAdded() is called whenever columns are rearranged, but the windows need not be resized, so return early.
