@@ -24,10 +24,6 @@ class OmninoApplication extends HTMLElement {
                 title: "Newcol",
                 link: this.addColumn.bind(this),
             },
-            {
-                title: "Help",
-                link: "/",
-            },
         ];
 
         const style = document.createElement("style");
