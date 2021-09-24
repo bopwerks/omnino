@@ -1,10 +1,10 @@
 const omnino = (() => {
 const commonStyles = `
 div.header { background: var(--omnino-menu-background, #eefdfd); color: var(--omnino-menu-fgcolor, black); display: grid; grid-template-columns: 17px 1fr; border-bottom: 1px solid var(--omnino-border-color, black); flex: 0 1 auto; }
-div.header > nav { display: flex; flex-flow: row; overflow-x: hidden; align-items: center; font-family: Verdana; font-size: 0.8em; }
-div.header > nav > h1, h2 { font-size: 1em; margin: 0 0.3em 0 0.3em; white-space: nowrap; }
+div.header > nav { display: flex; flex-flow: row; overflow-x: hidden; align-items: center; font-family: Verdana; font-size: 0.8rem; }
+div.header > nav > h1, h2 { font-size: 0.8rem; margin: 0 0.3rem 0 0.3rem; white-space: nowrap; }
 div.header > nav > h1::after { content: var(--omnino-title, "Omnino"); }
-nav > a { color: inherit; text-decoration: none; margin: 0; padding: 0.1em 0.4em 0.1em 0.4em; }
+nav > a { color: inherit; text-decoration: none; margin: 0; padding: 0.1rem 0.4rem 0.1rem 0.4rem; }
 nav > a:hover { background-color: var(--omnino-link-hover-color, #C6FDFD); }
 nav > a:active { background-color: var(--omnino-link-active-color, #a6FDFD); }
 div.column:first-of-type { border-left: none; }
@@ -536,7 +536,7 @@ class OmninoWindow extends HTMLElement {
         <style>
         ${commonStyles}
         div.window { display: flex; flex: 1 1 auto; flex-flow: column; min-width: 0; min-height: 17px; background-color: inherit; }
-        div.body { flex: 1 0 0; margin: 0; padding: var(--omnino-window-padding, 0 1em 1em 1em); direction: rtl; min-height: 0; overflow-y: scroll; overflow-x: auto; display: flex; flex-flow: column; }
+        div.body { flex: 1 0 0; margin: 0; padding: var(--omnino-window-padding, 1em 1em 1em 1em); direction: rtl; min-height: 0; overflow-y: scroll; overflow-x: auto; display: flex; flex-flow: column; }
         div.content { direction: ltr; min-height: 0; flex: 1 0 auto; }
         div.handle { cursor: move; }
         :host { border-top: 2px solid var(--omnino-border-color, black); display: flex; flex-flow: column; }
@@ -641,6 +641,10 @@ class OmninoWindow extends HTMLElement {
         ];   
         this.setMenu(this.menu);
     }
+    contentHeight() {
+        const content = this.shadowRoot.querySelector(".content");
+        return content.scrollHeight;
+    }
     removeWindow() {
         const column = this.parentNode;
         const i = elementIndex(this);
@@ -733,6 +737,9 @@ const makeApplicationProxy = (app) => {
             }
             return data.app.addColumn();
         },
+        columns: () => {
+            return Array.prototype.map.call(data.app.children, makeColumnProxy);
+        },
         addWindow: () => {
             // TODO: Add a column if none exists, then add window to it and return window proxy.
         },
@@ -769,11 +776,14 @@ const makeColumnProxy = (column) => {
             }
             data.column.setMenu(menu);
         },
-        addWindow: () => {
+        addWindow: (win) => {
             if (!attached()) {
                 throw new Error("Can't set the menu of deleted column.");
             }
-            return data.column.addWindow();
+            return data.column.addWindow(win);
+        },
+        windows: () => {
+            return Array.prototype.map.call(data.column.children, makeWindowProxy);
         },
     };
     return proxy;
@@ -817,6 +827,9 @@ const makeWindowProxy = (window) => {
             } else {
                 data.window.appendChild(content);
             }
+        },
+        contentHeight: () => {
+            return data.window.contentHeight();
         },
         setTitle: (title) => {
             data.window.setTitle(title);
