@@ -1,3 +1,4 @@
+const omnino = (() => {
 const commonStyles = `
 div.header { background: var(--omnino-menu-background, #eefdfd); color: var(--omnino-menu-fgcolor, black); display: grid; grid-template-columns: 17px 1fr; border-bottom: 1px solid var(--omnino-border-color, black); flex: 0 1 auto; }
 div.header > nav { display: flex; flex-flow: row; overflow-x: hidden; align-items: center; font-family: Verdana; font-size: 0.8em; }
@@ -831,54 +832,7 @@ const install = (container) => {
     return proxy;
 };
 
-const setup = (app, elts, title) => {
-    // Move the elements to a top-level div to simplify cloning.
-    const root = document.createElement("div");
-    elts.forEach(elt => root.appendChild(elt));
-    
-    // Creating a new window
-    const makeNewWindowFunc = (column, elts) => {
-        return () => {
-            const win = column.addWindow();
-            if (win !== null) {
-                win.setTitle(title);
-                win.setContent(root.cloneNode(true));
-            }
-            return win;
-        };
-    }
-
-    // Make the "Newcol" button create a new column.
-    const appMenu = app.getMenu();
-    const addColumn = () => {
-        const col = app.addColumn();
-        if (col !== null) {
-            const colMenu = col.getMenu();
-            colMenu[0].link = makeNewWindowFunc(col, elts);
-            col.setMenu(colMenu);
-        }
-        return col;
-    };
-    appMenu[0].link = addColumn;
-    app.setMenu(appMenu);
-
-    // Add two columns and one window.
-    const col1 = addColumn();
-    const makeWindow = makeNewWindowFunc(col1, elts);
-    makeWindow();
-    const col2 = addColumn();
-    return app;
-};
-
-const removeElements = (container) => {
-    const elts = Array.prototype.slice.call(container.children).filter(elt => elt.nodeName !== "SCRIPT");
-    elts.forEach(elt => container.removeChild(elt));
-    return elts;
-};
-
-window.addEventListener("load", () => {
-    const body = document.querySelector("body");
-    console.assert(body);
-    const elts = removeElements(body);
-    const app = setup(install(body), elts, document.title);
-});
+return {
+    install: install,
+}
+})();
