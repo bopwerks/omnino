@@ -135,8 +135,6 @@ class OmninoApplication extends HTMLElement {
     updateColumns() {
         const columns = this.shadowRoot.querySelector(".columns");
         console.assert(columns);
-        const totalWidth = this.columns.reduce(((acc, cur) => acc + cur), 0);
-        console.assert((this.columns.length > 0 && totalWidth === 100) || (this.columns.length === 0 && totalWidth === 0));
         const style = this.columns.map(percentage => `${percentage}%`).join(' ');
         columns.style.gridTemplateColumns = style;
     }
@@ -225,9 +223,12 @@ const moveElement = (arr, i, j) => {
 }
 
 const reduceFirst = (arr, predicate, combine, initial) => {
+    if (arr.length === 0) {
+        return null;
+    }
     let sum = initial;
     let i = 0;
-    let rval = null;
+    let rval = arr[0];
     for ( ; i < arr.length && !predicate(sum); ++i) {
         rval = arr[i];
         sum = combine(sum, arr[i]);
@@ -396,8 +397,6 @@ class OmninoColumn extends HTMLElement {
     }
     updateWindows() {
         const windows = this.shadowRoot.querySelector(".windows");
-        const totalHeight = this.windows.reduce((acc, cur) => acc + cur, 0);
-        console.assert((this.windows.length > 0 && totalHeight === 100) || (this.windows.length === 0 && totalHeight === 0));
         const style = this.windows.map(percentage => `${percentage}%`).join(' ');
         windows.style.gridTemplateRows = style;
     }
