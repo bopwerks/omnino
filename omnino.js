@@ -8,7 +8,7 @@ nav > a { color: inherit; text-decoration: none; margin: 0; padding: 0.1rem 0.4r
 nav > a:hover { background-color: var(--omnino-link-hover-color, #C6FDFD); }
 nav > a:active { background-color: var(--omnino-link-active-color, #a6FDFD); }
 div.column:first-of-type { border-left: none; }
-div.handle { background: var(--omnino-handle-color, #7C7ABD); }
+div.handle { background: var(--omnino-handle-color, #7C7ABD); user-select: none; }
 div.loading { background: linear-gradient(to left, #afadee, #eefdfd 100%); }
 `;
 
@@ -281,12 +281,10 @@ class OmninoColumn extends HTMLElement {
 
             // Store the offset in the parent to be used by its mouseup handler.
             app.style.cursor = "move";
-            app.style.userSelect = "none";
 
             const cancelMoveChild = event => {
                 app.removeEventListener("mouseup", moveChild);
                 app.style.cursor = "default";
-                app.style.userSelect = "auto";
                 app.removeEventListener("mouseleave", cancelMoveChild);
             };
             const moveChild = mouseUpEvent => {
@@ -563,12 +561,10 @@ class OmninoWindow extends HTMLElement {
 
             // Store the offset in the parent to be used by its mouseup handler.
             app.style.cursor = "move";
-            app.style.userSelect = "none";
 
             const cancelMoveChild = event => {
                 app.removeEventListener("mouseup", moveChild);
                 app.style.cursor = "default";
-                app.style.userSelect = "auto";
                 app.removeEventListener("mouseleave", cancelMoveChild);
             };
             const moveChild = mouseUpEvent => {
