@@ -529,6 +529,7 @@ class OmninoWindow extends HTMLElement {
         shadow.innerHTML = `
         <style>
         ${commonStyles}
+        div.header { grid-template-columns: ${getScrollbarWidth()}px 1fr; }
         div.window { display: flex; flex: 1 1 auto; flex-flow: column; min-width: 0; min-height: 17px; background-color: inherit; }
         div.body { flex: 1 0 0; margin: 0; padding: var(--omnino-window-padding, 1em 1em 1em 1em); direction: rtl; min-height: 0; overflow-y: scroll; overflow-x: auto; display: flex; flex-flow: column; }
         div.content { direction: ltr; min-height: 0; flex: 1 0 auto; }
