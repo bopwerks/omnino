@@ -1,6 +1,6 @@
 const omnino = (() => {
 const commonStyles = `
-div.header { background: var(--omnino-menu-background, #eefdfd); color: var(--omnino-menu-fgcolor, black); display: grid; grid-template-columns: 17px 1fr; border-bottom: 1px solid var(--omnino-border-color, black); flex: 0 1 auto; }
+div.header { background: var(--omnino-menu-background, #eefdfd); color: var(--omnino-menu-fgcolor, black); display: grid; grid-template-columns: 1.2rem 1fr; border-bottom: 1px solid var(--omnino-border-color, black); flex: 0 1 auto; }
 div.header > nav { display: flex; flex-flow: row; overflow-x: hidden; align-items: center; font-family: Verdana; font-size: 0.8rem; }
 div.header > nav > h1, h2 { font-size: 0.8rem; margin: 0 0.3rem 0 0.3rem; white-space: nowrap; }
 div.header > nav > h1::after { content: var(--omnino-title, "Omnino"); }
@@ -40,7 +40,6 @@ class OmninoApplication extends HTMLElement {
         {
             const header = document.createElement("div");
             header.classList.add("header");
-            header.style.gridTemplateColumns = `${getScrollbarWidth()}px 1fr`;
             {
                 const handle = document.createElement("div");
                 handle.classList.add("handle");
@@ -251,7 +250,7 @@ class OmninoColumn extends HTMLElement {
         shadow.innerHTML = `
         <style>
         ${commonStyles}
-        div.header { border-bottom-width: 2px; grid-template-columns: ${getScrollbarWidth()}px 1fr; }
+        div.header { border-bottom-width: 2px; }
         div.column { display: flex; flex-flow: column; height: 100%; min-width: 0; background: var(--omnino-background-color, white); }
         div.windows { flex: 1 1 auto; display: grid; min-width: 0; grid-template-rows: 100%; }
         div.handle { cursor: move; }
@@ -529,9 +528,12 @@ class OmninoWindow extends HTMLElement {
         shadow.innerHTML = `
         <style>
         ${commonStyles}
-        div.header { grid-template-columns: ${getScrollbarWidth()}px 1fr; }
         div.window { display: flex; flex: 1 1 auto; flex-flow: column; min-width: 0; min-height: 17px; background-color: inherit; }
         div.body { flex: 1 0 0; margin: 0; padding: var(--omnino-window-padding, 1em 1em 1em 1em); direction: rtl; min-height: 0; overflow-y: scroll; overflow-x: auto; display: flex; flex-flow: column; }
+        // div.body::-webkit-scrollbar { width: 1.2rem; height: 2em; }
+        // div.body::-webkit-scrollbar-button { background: #ccc; }
+        // div.body::-webkit-scrollbar-track-piece { background: #888; }
+        // div.body::-webkit-scrollbar-thumb { background: #eee; }
         div.content { direction: ltr; min-height: 0; flex: 1 0 auto; }
         div.handle { cursor: move; }
         :host { border-top: 2px solid var(--omnino-border-color, black); display: flex; flex-flow: column; }
